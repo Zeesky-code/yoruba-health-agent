@@ -11,7 +11,7 @@ agent loop beats a fixed retrieval pipeline. Built on Cohere (`embed-multilingua
 ## Status
 
 - [x] Session 1: corpus (fetch, chunk, embed), English search check
-- [ ] Session 2: eval set (60 hand-written Yorùbá questions + gold chunks)
+- [x] Session 2: eval set, synthetic v0 (hand-written Yorùbá v1 still to come)
 - [ ] Session 3: tools + fixed pipeline, retrieval table
 - [ ] Session 4: agent harness (loop, retries, budget, traces)
 - [ ] Session 5: run both, report tables
@@ -31,6 +31,29 @@ labels refer to its chunk IDs (`<medlineplus topic id>-<chunk index>`).
 
 Chunks hold about 400 tokens (Cohere tokenizer) with about 50 tokens of overlap. They
 are packed at sentence boundaries so they still read well when shown as citations.
+
+## Eval set
+
+`evals/questions.jsonl` has 60 questions: 40 answerable (with 1–3 gold chunk IDs each),
+10 out-of-scope, and 10 asking for personal medical advice. The last two groups must be
+refused.
+
+**The current set is synthetic (`"source": "synthetic-v0"`).** Questions are written in
+English by `command-a-03-2025` from sampled corpus chunks and translated to Yorùbá by
+`command-a-translate-08-2025` (`evals/generate_questions.py`). Gold labels are the
+source chunk plus any English top-5 hits that an LLM judge says also answer the
+question. This has known biases:
+
+- The questions come from the passages, so they share vocabulary with them, which
+  makes retrieval look better than it is on real questions.
+- The same model family writes the Yorùbá and later reads it, so the cross-lingual
+  gap is likely understated.
+
+I searched for an existing set and found none that fits. [AfriMed-QA](https://arxiv.org/abs/2411.15640)
+is English-only. [AfriQA](https://github.com/masakhane-io/afriqa) and
+[Y-NQ](https://aclanthology.org/2025.africanlp-1.34/) have Yorùbá questions, but they
+are not about health. A hand-written native-speaker Yorùbá set will replace v0 under
+the same schema.
 
 ## Running
 
