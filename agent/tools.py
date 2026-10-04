@@ -9,6 +9,9 @@ import json
 import os
 import re
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, field, replace
 from functools import cache
 from pathlib import Path
@@ -85,18 +88,57 @@ def client() -> cohere.ClientV2:
     return cohere.ClientV2(api_key=key)
 
 
+# Every Cohere call appends {model, tokens_in, tokens_out, search_units, wait_ms} here
+# while a track_usage() block is open. The harness uses it to cost and time each step.
+_usage_sink: ContextVar[list[dict] | None] = ContextVar("usage_sink", default=None)
+
+
+@contextmanager
+def track_usage() -> Iterator[list[dict]]:
+    records: list[dict] = []
+    token = _usage_sink.set(records)
+    try:
+        yield records
+    finally:
+        _usage_sink.reset(token)
+
+
+def _record_usage(model: str, resp, wait_ms: float) -> None:
+    sink = _usage_sink.get()
+    if sink is None:
+        return
+    billed = getattr(getattr(resp, "usage", None), "billed_units", None) or getattr(
+        getattr(resp, "meta", None), "billed_units", None
+    )
+    sink.append(
+        {
+            "model": model,
+            "tokens_in": int(getattr(billed, "input_tokens", 0) or 0),
+            "tokens_out": int(getattr(billed, "output_tokens", 0) or 0),
+            "search_units": int(getattr(billed, "search_units", 0) or 0),
+            "wait_ms": round(wait_ms),
+        }
+    )
+
+
 def call_with_rate_limit(fn, *args, attempts: int = 6, wait_s: float = 15.0, **kwargs):
     """Call a Cohere client method, waiting out 429s and dropped connections.
 
-    Trial keys allow 20 calls/minute, so a long batch job hits 429s by design.
+    Trial keys allow 20 calls/minute, so a long batch job hits 429s by design. Time spent
+    waiting is recorded separately so latency numbers can exclude it.
     """
+    waited = 0.0
     for attempt in range(attempts):
         try:
-            return fn(*args, **kwargs)
+            resp = fn(*args, **kwargs)
         except (cohere.errors.TooManyRequestsError, httpx.TransportError):
             if attempt == attempts - 1:
                 raise
             time.sleep(wait_s)
+            waited += wait_s * 1000
+        else:
+            _record_usage(kwargs.get("model", "?"), resp, waited)
+            return resp
 
 
 def embed(texts: list[str], input_type: str) -> np.ndarray:
