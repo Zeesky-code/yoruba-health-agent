@@ -15,7 +15,7 @@ agent loop beats a fixed retrieval pipeline. Built on Cohere (`embed-multilingua
 - [x] Session 3: tools + fixed pipeline, retrieval table
 - [x] Session 4: agent harness (loop, retries, budget, traces)
 - [ ] Session 5: run both, report tables
-- [ ] Session 6: Gradio app on HF Spaces, full write-up
+- [~] Session 6: Gradio app (`app.py`) and HF Spaces deploy script done; full write-up after session 5
 
 ## Results so far
 
@@ -169,4 +169,9 @@ cp .env.example .env            # add COHERE_API_KEY
 uv run python -m corpus.build_corpus
 uv run python -m agent.tools "how is malaria spread"
 uv run pytest
+uv run python app.py            # Gradio demo on http://127.0.0.1:7860
 ```
+
+Deploy the demo with `scripts/deploy_space.sh`. It needs `hf auth login` and a
+`COHERE_API_KEY` secret on the Space. The demo allows 5 questions per visitor session
+and 60 per day.

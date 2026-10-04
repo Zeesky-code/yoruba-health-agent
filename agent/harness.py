@@ -141,6 +141,7 @@ class RunResult:
     tool_errors: int
     tool_calls: int
     stopped_by: str  # "terminal" | "budget" | "max_steps"
+    trace: list[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -275,7 +276,9 @@ def run(
 
     def finish(output, steps: int, stopped_by: str) -> RunResult:
         latency = (time.perf_counter() - started) * 1000 - waited_ms
-        return RunResult(output, run_id, steps, state.spent, latency, errors, calls, stopped_by)
+        return RunResult(
+            output, run_id, steps, state.spent, latency, errors, calls, stopped_by, trace.steps
+        )
 
     for step in range(max_steps):
         if state.spent > budget_usd:
