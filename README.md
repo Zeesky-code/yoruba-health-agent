@@ -12,10 +12,57 @@ agent loop beats a fixed retrieval pipeline. Built on Cohere (`embed-multilingua
 
 - [x] Session 1: corpus (fetch, chunk, embed), English search check
 - [x] Session 2: eval set, synthetic v0 (hand-written Yorùbá v1 still to come)
-- [ ] Session 3: tools + fixed pipeline, retrieval table
+- [x] Session 3: tools + fixed pipeline, retrieval table (Yorùbá answer quality still open)
 - [ ] Session 4: agent harness (loop, retries, budget, traces)
 - [ ] Session 5: run both, report tables
 - [ ] Session 6: Gradio app on HF Spaces, full write-up
+
+## Results so far
+
+### Retrieval (40 answerable questions, synthetic v0 eval set)
+
+| Query | Ranking | recall@5 | nDCG@10 |
+|---|---|---|---|
+| Yorùbá query | Embed only | 0.642 | 0.599 |
+| Yorùbá query | Embed + Rerank | **0.296** | 0.281 |
+| Yorùbá → English (`translate_query`) | Embed only | 0.842 | 0.825 |
+| Yorùbá → English (`translate_query`) | Embed + Rerank | 0.833 | 0.858 |
+| English query (ceiling) | Embed only | 0.975 | 0.951 |
+| English query (ceiling) | Embed + Rerank | 0.975 | 0.959 |
+
+- **`rerank-multilingual-v3.0` hurts Yorùbá queries.** It halves recall@5 (0.64 → 0.30),
+  and its relevance scores collapse to about 0.003 for every Yorùbá query, so they
+  can't be used as a confidence signal. `embed-multilingual-v3.0` handles Yorùbá
+  reasonably well.
+- **Translating the query first recovers most of the gap** (0.84 vs the 0.975 English
+  ceiling). After translation, the rerank scores separate questions again. The median
+  top score is 0.998 for answerable questions and 0.000 for out-of-scope ones. That
+  makes rerank useful as the refusal signal even though it adds no recall.
+- **Part of the English ceiling is leakage.** The synthetic questions were written from
+  the English passages, so English queries share their wording. The true cross-lingual
+  gap is smaller than 0.975 − 0.842 suggests.
+
+Reproduce with `uv run python -m evals.run_eval retrieval && uv run python -m evals.report`.
+Raw rankings are in `evals/results/retrieval.jsonl`.
+
+## What broke
+
+- **`translate_query` on `command-a-03-2025` made up different questions.** For 4 of
+  the 40 Yorùbá questions, the "translation" was a different question:
+  *"How do vaccines protect me and my community?"* came back as *"How does
+  secondhand smoke affect me…?"*, and handwashing came back as hypertension medication.
+  Switching to `tiny-aya-global` fixed all four and raised translated recall@5 from 0.68
+  to 0.84. The old rankings are kept in
+  `evals/results/retrieval_translate-command-a.jsonl`.
+- **No Cohere model tested writes good grounded Yorùbá answers yet.** `command-a-03-2025`
+  cites its sources correctly, but its Yorùbá is often wrong. One answer opened with
+  "a gift is what causes malaria", and another got stuck repeating a sentence.
+  `tiny-aya-global` writes fluent Yorùbá, but it ignored the documents, gave no
+  citations, and named antimalarial drugs that aren't in the sources.
+- **The pipeline's refusal threshold (top rerank score < 0.1) can't catch personal
+  medical questions.** Those retrieve relevant pages and score high (median 0.72), so
+  only 1 of 10 is refused. Out-of-scope questions are caught (9 of 10). The threshold
+  was set on this same eval set.
 
 ## Corpus
 
