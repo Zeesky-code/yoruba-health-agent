@@ -49,7 +49,14 @@ wrong ones. One question asks about blood sugar being too *low*, its Yorùbá sa
 *high*, and it still scored 0.93, because the back-translation quietly fixed the error. None of the models handles medical
 vocabulary well. "Diabetes", for example, came back as unrelated words. Gold labels are the
 source chunk plus any English top-5 hits that an LLM judge says also answer the
-question. This has known biases:
+question. Afterwards, 45 of the 60 Yorùbá questions were post-edited
+(`"yo_post_edited": true`). The edits replace mistranslated medical terms with the words
+people actually use: *ibà* (malaria), *ikọ́ ẹ̀gbẹ* (TB), *ẹ̀jẹ̀ ríru* (high blood
+pressure), *àrùn ṣúgà* (diabetes), *abẹ́rẹ́ àjẹsára* (vaccine), *ẹ̀fọn* (mosquito). They
+also fix reversed meanings, such as "too low" that the model had turned into "too high".
+The post-edits were made with an LLM, not by a native speaker. In those rows
+`yo_roundtrip_sim` still scores the original machine translation. This has known
+biases:
 
 - The questions come from the passages, so they share vocabulary with them, which
   makes retrieval look better than it is on real questions.

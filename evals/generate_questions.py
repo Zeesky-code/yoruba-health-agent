@@ -13,6 +13,7 @@ it, giving 1-3 gold IDs per question.
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import random
@@ -198,7 +199,19 @@ def refusals(kind: str, n: int = 10) -> list[dict]:
     return [{"type": kind, "area": None, "question_en": q, "gold_chunk_ids": []} for q in questions]
 
 
+def has_post_edits(path: Path = OUT_FILE) -> bool:
+    if not path.exists():
+        return False
+    rows = (json.loads(line) for line in path.read_text(encoding="utf-8").splitlines())
+    return any(r.get("yo_post_edited") for r in rows)
+
+
 def main() -> None:
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--force", action="store_true", help="overwrite post-edited rows")
+    if has_post_edits() and not ap.parse_args().force:
+        raise SystemExit(f"{OUT_FILE} has post-edited rows; pass --force to overwrite")
+
     rng = random.Random(SEED)
     print("answerable:")
     rows = answerable(rng)
@@ -220,6 +233,7 @@ def main() -> None:
                 "gold_chunk_ids": row["gold_chunk_ids"],
                 "source": SOURCE,
                 "yo_roundtrip_sim": sim,
+                "yo_post_edited": False,
             }
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
     weak = sum(s < 0.6 for s in sims)
