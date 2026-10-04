@@ -10,13 +10,14 @@ from functools import cache
 from pathlib import Path
 
 import cohere
+import httpx
 import numpy as np
 from dotenv import load_dotenv
 
 EMBED_MODEL = "embed-multilingual-v3.0"
 RERANK_MODEL = "rerank-multilingual-v3.0"
 CHAT_MODEL = "command-a-03-2025"
-TRANSLATE_MODEL = "command-a-translate-08-2025"
+TRANSLATE_MODEL = "tiny-aya-global"  # best EN->YO round-trip of 4 Cohere models tried
 
 CORPUS_PATH = Path(__file__).resolve().parent.parent / "corpus" / "corpus.jsonl"
 
@@ -41,11 +42,14 @@ def client() -> cohere.ClientV2:
 
 
 def call_with_rate_limit(fn, *args, attempts: int = 6, wait_s: float = 15.0, **kwargs):
-    """Call a Cohere client method, waiting out 429s (trial keys allow 20 calls/minute)."""
+    """Call a Cohere client method, waiting out 429s and dropped connections.
+
+    Trial keys allow 20 calls/minute, so a long batch job hits 429s by design.
+    """
     for attempt in range(attempts):
         try:
             return fn(*args, **kwargs)
-        except cohere.errors.TooManyRequestsError:
+        except (cohere.errors.TooManyRequestsError, httpx.TransportError):
             if attempt == attempts - 1:
                 raise
             time.sleep(wait_s)
