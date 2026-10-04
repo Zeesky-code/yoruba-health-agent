@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 from dataclasses import dataclass, field, replace
 from functools import cache
@@ -51,6 +52,8 @@ class Answer:
     text: str
     citations: list[Citation] = field(default_factory=list)
     chunk_ids: list[str] = field(default_factory=list)  # passages the model was given
+    text_en: str = ""  # the grounded English answer before translation
+    citations_en: list[Citation] = field(default_factory=list)
 
 
 RefusalReason = Literal["out_of_scope", "personal_medical", "low_confidence"]
@@ -180,18 +183,105 @@ def translate_query(text: str, target: str = "en") -> str:
     return chat_text(TRANSLATE_MODEL, prompt, temperature=0)
 
 
-ANSWER_SYSTEM_PROMPT = """You answer health questions for Yorùbá speakers using ONLY the
-provided documents, which are English MedlinePlus pages.
+ANSWER_SYSTEM_PROMPT = """You answer health questions from Yorùbá speakers using ONLY the
+provided documents, which are English MedlinePlus pages. The question may be in Yorùbá.
 
-- Always reply in Yorùbá with full tone marks, in plain everyday language.
+- Reply in plain, simple English. Your answer will be translated into Yorùbá, so use
+  short sentences and everyday words.
 - Use only facts from the documents. If they do not answer the question, say so.
 - Give general information only: no diagnoses, no drug doses, no advice about one
   person's own treatment. Suggest seeing a health worker where it helps.
-- Keep it short: three to six sentences."""
+- Keep it short: three to six sentences. No markdown, no lists."""
+
+# Terms the translator got wrong without help (e.g. mosquito -> ọlọ́wọ́, "rich person").
+GLOSSARY = {
+    "malaria": "ibà",
+    "mosquito": "ẹ̀fọn",
+    "mosquito net": "àwọ̀n ẹ̀fọn",
+    "tuberculosis (TB)": "ikọ́ ẹ̀gbẹ",
+    "high blood pressure": "ẹ̀jẹ̀ ríru",
+    "diabetes": "àrùn ṣúgà",
+    "blood sugar": "ṣúgà inú ẹ̀jẹ̀",
+    "vaccine": "abẹ́rẹ́ àjẹsára",
+    "germs / bacteria": "kòkòrò àrùn",
+    "lungs": "ẹ̀dọ̀fóró",
+    "kidneys": "kíndìnrín",
+    "stroke": "àrùn ẹ̀gbà",
+    "pregnancy": "oyún",
+    "fever": "ibà / ara gbígbóná",
+    "medicine": "oògùn",
+    "health care provider / doctor": "dókítà / òṣìṣẹ́ ìlera",
+}
+
+TRANSLATE_ANSWER_PROMPT = """Translate each numbered English sentence into natural, everyday
+Yorùbá with full tone marks. Keep medicine names and numbers unchanged. Use these terms:
+{glossary}
+
+Reply with exactly {n} lines, each starting with its number, and nothing else. No markdown.
+
+{numbered}"""
+
+
+def strip_markdown(text: str) -> str:
+    return re.sub(r"[*_`#]+", "", text).strip()
+
+
+def split_sentences(text: str, citations: list[Citation]) -> list[tuple[str, list[str]]]:
+    """Split an answer into sentences and list items, each with the chunk IDs cited in it."""
+    sentences = []
+    for m in re.finditer(r"[^.!?\n]+[.!?]*", text):
+        sentence = re.sub(r"^\s*(?:[-*•]|\d+[.)])\s+", "", m.group()).strip()
+        if not sentence:
+            continue
+        ids = sorted(
+            {
+                cid
+                for c in citations
+                if c.start < m.end() and c.end > m.start()
+                for cid in c.chunk_ids
+            }
+        )
+        sentences.append((sentence, ids))
+    return sentences
+
+
+def parse_numbered(text: str, n: int) -> list[str] | None:
+    """Parse "1. ..." lines; None unless exactly lines 1..n are present."""
+    found = {}
+    for line in text.splitlines():
+        m = re.match(r"\s*(\d+)[.)]\s*(.+)", line)
+        if m:
+            found[int(m.group(1))] = m.group(2).strip()
+    if sorted(found) != list(range(1, n + 1)):
+        return None
+    return [found[i] for i in range(1, n + 1)]
+
+
+def translate_sentences(sentences: list[str]) -> list[str]:
+    """One call for all sentences; sentence-by-sentence if the numbering comes back wrong."""
+    glossary = "\n".join(f"- {en}: {yo}" for en, yo in GLOSSARY.items())
+    numbered = "\n".join(f"{i}. {s}" for i, s in enumerate(sentences, 1))
+    prompt = TRANSLATE_ANSWER_PROMPT.format(glossary=glossary, n=len(sentences), numbered=numbered)
+    raw = strip_markdown(chat_text(TRANSLATE_MODEL, prompt, temperature=0))
+    out = parse_numbered(raw, len(sentences))
+    if out is not None:
+        return out
+    singles = []
+    for sentence in sentences:
+        prompt = TRANSLATE_ANSWER_PROMPT.format(glossary=glossary, n=1, numbered=f"1. {sentence}")
+        raw = strip_markdown(chat_text(TRANSLATE_MODEL, prompt, temperature=0))
+        singles.append((parse_numbered(raw, 1) or [raw])[0])
+    return singles
 
 
 def answer(passages: list[Chunk], question: str) -> Answer:
-    """Terminal tool: grounded answer in Yorùbá, with Cohere's native citations."""
+    """Terminal tool: grounded answer in Yorùbá with per-sentence citations.
+
+    No Cohere model tested both writes good Yorùbá and stays grounded: command-a cites
+    correctly but garbles Yorùbá, tiny-aya-global writes fluent Yorùbá but ignores the
+    documents. So command-a answers in English with native citations, then
+    tiny-aya-global translates sentence by sentence and each sentence keeps its sources.
+    """
     resp = call_with_rate_limit(
         client().chat,
         model=ANSWER_MODEL,
@@ -205,8 +295,8 @@ def answer(passages: list[Chunk], question: str) -> Answer:
         ],
         temperature=0,
     )
-    text = next(c.text for c in resp.message.content if c.type == "text").strip()
-    citations = [
+    text_en = next(c.text for c in resp.message.content if c.type == "text").strip()
+    citations_en = [
         Citation(
             start=c.start,
             end=c.end,
@@ -215,7 +305,22 @@ def answer(passages: list[Chunk], question: str) -> Answer:
         )
         for c in (resp.message.citations or [])
     ]
-    return Answer(text=text, citations=citations, chunk_ids=[c.id for c in passages])
+
+    sentences = split_sentences(text_en, citations_en)
+    translated = translate_sentences([s for s, _ in sentences])
+    parts, citations, pos = [], [], 0
+    for yo, (_, ids) in zip(translated, sentences, strict=True):
+        if ids:
+            citations.append(Citation(start=pos, end=pos + len(yo), text=yo, chunk_ids=ids))
+        parts.append(yo)
+        pos += len(yo) + 1
+    return Answer(
+        text=" ".join(parts),
+        citations=citations,
+        chunk_ids=[c.id for c in passages],
+        text_en=text_en,
+        citations_en=citations_en,
+    )
 
 
 def refuse(reason: RefusalReason) -> Refusal:
