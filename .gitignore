@@ -5,3 +5,4 @@ __pycache__/
 .env
 corpus/raw/
 .DS_Store
+evals/.generate_cache.jsonl

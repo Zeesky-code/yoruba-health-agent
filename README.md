@@ -19,9 +19,9 @@ agent loop beats a fixed retrieval pipeline. Built on Cohere (`embed-multilingua
 
 ## Corpus
 
-There are 150 [MedlinePlus](https://medlineplus.gov) health topics across eight areas:
-malaria and tropical infections, TB, hypertension, diabetes, pregnancy, vaccination,
-nutrition, and sickle cell (`corpus/topics.txt`). MedlinePlus health-topic summaries are
+There are 150 [MedlinePlus](https://medlineplus.gov) health topics across nine areas:
+malaria and other fevers, other infections (HIV, hepatitis, diarrhoea), TB,
+hypertension, diabetes, pregnancy, vaccination, nutrition, and sickle cell (`corpus/topics.txt`). MedlinePlus health-topic summaries are
 written by the US National Library of Medicine and are public domain.
 
 The text comes from the official [MedlinePlus XML dump](https://medlineplus.gov/xml.html),
@@ -40,7 +40,14 @@ refused.
 
 **The current set is synthetic (`"source": "synthetic-v0"`).** Questions are written in
 English by `command-a-03-2025` from sampled corpus chunks and translated to Yorùbá by
-`command-a-translate-08-2025` (`evals/generate_questions.py`). Gold labels are the
+`tiny-aya-global` (`evals/generate_questions.py`). I picked the translator by round-trip
+scoring: 15 questions went EN → YO → EN, and I measured the embedding similarity to the
+original. `tiny-aya-global` scored 0.77, `tiny-aya-earth` 0.75,
+`north-small-translate-09-2026` 0.70 and `command-a-translate-08-2025` 0.63. Each row
+keeps its own score in `yo_roundtrip_sim`. The score catches garbled rows but misses
+wrong ones. One question asks about blood sugar being too *low*, its Yorùbá says too
+*high*, and it still scored 0.93, because the back-translation quietly fixed the error. None of the models handles medical
+vocabulary well. "Diabetes", for example, came back as unrelated words. Gold labels are the
 source chunk plus any English top-5 hits that an LLM judge says also answer the
 question. This has known biases:
 
