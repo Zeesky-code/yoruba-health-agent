@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: yoruba-health-agent
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.12
+      - key: HOST
+        value: 0.0.0.0
+      - key: COHERE_API_KEY
+        sync: false

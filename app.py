@@ -6,6 +6,7 @@ uv run python app.py
 from __future__ import annotations
 
 import json
+import os
 import threading
 from datetime import date
 from pathlib import Path
@@ -150,4 +151,8 @@ demo = build()
 
 if __name__ == "__main__":
     # One request at a time: the trial key cannot serve concurrent agent runs.
-    demo.queue(default_concurrency_limit=1).launch()
+    # Render sets PORT and needs the server on all interfaces.
+    demo.queue(default_concurrency_limit=1).launch(
+        server_name=os.environ.get("HOST", "127.0.0.1"),
+        server_port=int(os.environ.get("PORT", 7860)),
+    )

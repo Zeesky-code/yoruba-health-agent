@@ -15,7 +15,7 @@ agent loop beats a fixed retrieval pipeline. Built on Cohere (`embed-multilingua
 - [x] Session 3: tools + fixed pipeline, retrieval table
 - [x] Session 4: agent harness (loop, retries, budget, traces)
 - [ ] Session 5: run both, report tables
-- [~] Session 6: Gradio app (`app.py`) and HF Spaces deploy script done; full write-up after session 5
+- [~] Session 6: Gradio app (`app.py`) deployed on Render; full write-up after session 5
 
 ## Results so far
 
@@ -172,6 +172,9 @@ uv run pytest
 uv run python app.py            # Gradio demo on http://127.0.0.1:7860
 ```
 
-Deploy the demo with `scripts/deploy_space.sh`. It needs `hf auth login` and a
-`COHERE_API_KEY` secret on the Space. The demo allows 5 questions per visitor session
-and 60 per day.
+The demo is deployed on Render's free tier from `render.yaml`. In the Render dashboard,
+choose New → Blueprint, pick this repo, and set `COHERE_API_KEY` when asked. Free
+instances sleep after 15 minutes idle, so the first visit takes about a minute. The
+demo allows 5 questions per visitor session and 60 per day; the daily count resets
+whenever the instance restarts. (Hugging Face now requires PRO for new Gradio and
+Docker Spaces.)
