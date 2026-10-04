@@ -1,13 +1,17 @@
-"""The agent's tools."""
+"""The agent's five tools: three that gather evidence, two terminal ones that end a run.
+
+search_corpus -> rerank -> (translate_query) -> answer | refuse
+"""
 
 from __future__ import annotations
 
 import json
 import os
 import time
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from functools import cache
 from pathlib import Path
+from typing import Literal
 
 import cohere
 import httpx
@@ -18,6 +22,8 @@ EMBED_MODEL = "embed-multilingual-v3.0"
 RERANK_MODEL = "rerank-multilingual-v3.0"
 CHAT_MODEL = "command-a-03-2025"
 TRANSLATE_MODEL = "tiny-aya-global"  # best EN->YO round-trip of 4 Cohere models tried
+
+ANSWER_MODEL = CHAT_MODEL
 
 CORPUS_PATH = Path(__file__).resolve().parent.parent / "corpus" / "corpus.jsonl"
 
@@ -30,6 +36,41 @@ class Chunk:
     url: str
     text: str
     score: float = 0.0
+
+
+@dataclass(frozen=True)
+class Citation:
+    start: int
+    end: int
+    text: str
+    chunk_ids: list[str]
+
+
+@dataclass(frozen=True)
+class Answer:
+    text: str
+    citations: list[Citation] = field(default_factory=list)
+    chunk_ids: list[str] = field(default_factory=list)  # passages the model was given
+
+
+RefusalReason = Literal["out_of_scope", "personal_medical", "low_confidence"]
+
+REFUSAL_MESSAGES: dict[str, str] = {
+    "out_of_scope": "Ẹ má bínú, ìbéèrè nípa ìlera nìkan ni mo lè dáhùn.",
+    "personal_medical": (
+        "Ẹ má bínú, mi ò lè fún yín ní ìmọ̀ràn ìtọ́jú fún ara yín. Ẹ jọ̀wọ́ ẹ lọ rí dókítà "
+        "tàbí òṣìṣẹ́ ìlera. Tí ó bá jẹ́ pàjáwìrì, ẹ lọ sí ilé ìwòsàn lẹ́sẹ̀kẹsẹ̀."
+    ),
+    "low_confidence": (
+        "Ẹ má bínú, mi ò rí ìdáhùn tó dájú sí ìbéèrè yìí nínú àwọn ìwé ìlera tí mo ní."
+    ),
+}
+
+
+@dataclass(frozen=True)
+class Refusal:
+    reason: RefusalReason
+    text: str
 
 
 @cache
@@ -101,6 +142,85 @@ def search_corpus(query: str, k: int = 50) -> list[Chunk]:
     chunks, matrix = load_corpus()
     query_vec = embed([query], input_type="search_query")[0]
     return top_k(query_vec, chunks, matrix, k)
+
+
+def document_text(chunk: Chunk) -> str:
+    return f"{chunk.topic}\n\n{chunk.text}"
+
+
+def rerank(query: str, chunks: list[Chunk], top_n: int = 5) -> list[Chunk]:
+    """Reorder chunks by cross-encoder relevance; score becomes the rerank score (0-1)."""
+    if not chunks:
+        return []
+    resp = call_with_rate_limit(
+        client().rerank,
+        model=RERANK_MODEL,
+        query=query,
+        documents=[document_text(c) for c in chunks],
+        top_n=min(top_n, len(chunks)),
+    )
+    return [replace(chunks[r.index], score=float(r.relevance_score)) for r in resp.results]
+
+
+TRANSLATE_QUERY_PROMPT = """Translate this health question into {target}. Keep medical terms
+precise. Output only the translation.
+
+{text}"""
+
+LANGUAGE_NAMES = {"en": "English", "yo": "Yorùbá"}
+
+
+def translate_query(text: str, target: str = "en") -> str:
+    """Fallback for when retrieval on the original-language query scores low.
+
+    Uses tiny-aya-global: command-a-03-2025 invented a different question for 4 of 40
+    Yorùbá eval questions (vaccines -> "secondhand smoke"), tiny-aya-global for none.
+    """
+    prompt = TRANSLATE_QUERY_PROMPT.format(target=LANGUAGE_NAMES[target], text=text)
+    return chat_text(TRANSLATE_MODEL, prompt, temperature=0)
+
+
+ANSWER_SYSTEM_PROMPT = """You answer health questions for Yorùbá speakers using ONLY the
+provided documents, which are English MedlinePlus pages.
+
+- Always reply in Yorùbá with full tone marks, in plain everyday language.
+- Use only facts from the documents. If they do not answer the question, say so.
+- Give general information only: no diagnoses, no drug doses, no advice about one
+  person's own treatment. Suggest seeing a health worker where it helps.
+- Keep it short: three to six sentences."""
+
+
+def answer(passages: list[Chunk], question: str) -> Answer:
+    """Terminal tool: grounded answer in Yorùbá, with Cohere's native citations."""
+    resp = call_with_rate_limit(
+        client().chat,
+        model=ANSWER_MODEL,
+        messages=[
+            {"role": "system", "content": ANSWER_SYSTEM_PROMPT},
+            {"role": "user", "content": question},
+        ],
+        documents=[
+            {"id": c.id, "data": {"title": c.topic, "snippet": c.text, "url": c.url}}
+            for c in passages
+        ],
+        temperature=0,
+    )
+    text = next(c.text for c in resp.message.content if c.type == "text").strip()
+    citations = [
+        Citation(
+            start=c.start,
+            end=c.end,
+            text=c.text,
+            chunk_ids=sorted({s.id for s in (c.sources or []) if s.id}),
+        )
+        for c in (resp.message.citations or [])
+    ]
+    return Answer(text=text, citations=citations, chunk_ids=[c.id for c in passages])
+
+
+def refuse(reason: RefusalReason) -> Refusal:
+    """Terminal tool: a fixed Yorùbá message per reason, so refusals cost nothing."""
+    return Refusal(reason=reason, text=REFUSAL_MESSAGES[reason])
 
 
 if __name__ == "__main__":
