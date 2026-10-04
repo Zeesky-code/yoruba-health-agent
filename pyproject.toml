@@ -1,0 +1,30 @@
+[project]
+name = "yoruba-health-agent"
+version = "0.1.0"
+description = "Answers Yorùbá health questions from English MedlinePlus pages, with citations and refusals"
+readme = "README.md"
+authors = [{ name = "Zainab Lawal", email = "zainablaw1012@gmail.com" }]
+requires-python = ">=3.12"
+dependencies = [
+    "cohere>=7.2.0",
+    "httpx>=0.28.1",
+    "numpy>=2.5.3",
+    "python-dotenv>=1.2.4",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.16.10",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
