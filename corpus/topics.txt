@@ -1,0 +1,168 @@
+# MedlinePlus health topics included in the corpus, grouped by area.
+# Titles must match the <health-topic title="..."> attribute in the XML dump exactly.
+
+[malaria]
+Malaria
+Mosquito Bites
+Fever
+Dengue
+Chikungunya
+Zika Virus
+Hemorrhagic Fevers
+Ebola
+Parasitic Diseases
+Traveler's Health
+Cholera
+Diarrhea
+Dehydration
+Gastroenteritis
+Rotavirus Infections
+Drinking Water
+Germs and Hygiene
+Meningitis
+Meningococcal Disease
+HIV
+HIV Medicines
+HIV and Pregnancy
+HIV: PrEP and PEP
+Living with HIV
+Hepatitis
+Hepatitis A
+Hepatitis B
+Hepatitis C
+Sexually Transmitted Infections
+Syphilis
+
+[tb]
+Tuberculosis
+Mycobacterial Infections
+Cough
+Pneumonia
+Antibiotics
+Antibiotic Resistance
+Infection Control
+HIV and Infections
+Lung Diseases
+Breathing Problems
+
+[hypertension]
+High Blood Pressure
+How to Prevent High Blood Pressure
+Blood Pressure Medicines
+High Blood Pressure in Pregnancy
+DASH Eating Plan
+Sodium
+Low Blood Pressure
+Vital Signs
+Stroke
+Transient Ischemic Attack
+Heart Attack
+Heart Failure
+Heart Diseases
+How to Prevent Heart Disease
+Coronary Artery Disease
+Atherosclerosis
+Chest Pain
+Cholesterol
+Chronic Kidney Disease
+Kidney Failure
+
+[diabetes]
+Diabetes
+Diabetes Type 1
+Diabetes Type 2
+Prediabetes
+How to Prevent Diabetes
+Diabetes Medicines
+Diabetic Diet
+Diabetic Foot
+Diabetic Eye Problems
+Diabetic Kidney Problems
+Diabetic Nerve Problems
+Diabetes Complications
+Diabetes and Pregnancy
+Diabetes in Children and Teens
+Blood Glucose
+Hypoglycemia
+Hyperglycemia
+A1C
+Obesity
+Weight Control
+
+[pregnancy]
+Pregnancy
+Prenatal Care
+Prenatal Testing
+Pregnancy and Nutrition
+Pregnancy and Medicines
+Health Problems in Pregnancy
+Infections and Pregnancy
+Preconception Care
+Childbirth
+Childbirth Problems
+Cesarean Delivery
+Miscarriage
+Stillbirth
+Ectopic Pregnancy
+Preterm Labor
+Premature Babies
+Postpartum Care
+Postpartum Depression
+Breastfeeding
+Birth Control
+Folic Acid
+Fetal Health and Development
+Teenage Pregnancy
+Infant and Newborn Care
+Common Infant and Newborn Problems
+Jaundice
+Newborn Screening
+
+[vaccination]
+Vaccines
+Childhood Vaccines
+Vaccine Safety
+Measles
+Polio and Post-Polio Syndrome
+Tetanus
+Tetanus, Diphtheria, and Pertussis Vaccines
+Whooping Cough
+Diphtheria
+Flu
+Flu Shot
+COVID-19 Vaccines
+HPV
+Rubella
+Mumps
+Chickenpox
+Pneumococcal Infections
+Rabies
+
+[nutrition]
+Nutrition
+Malnutrition
+Child Nutrition
+Infant and Newborn Nutrition
+Vitamins
+Vitamin A
+Vitamin D
+Dietary Fiber
+Anemia
+Calcium
+Dietary Proteins
+Carbohydrates
+Dietary Fats
+Food Safety
+Foodborne Illness
+
+[sickle_cell]
+Sickle Cell Disease
+Blood Disorders
+Blood Transfusion and Donation
+G6PD Deficiency
+Thalassemia
+Genetic Counseling
+Genetic Testing
+Pain Relievers
+Blood Count Tests
+Bone Marrow Transplantation
