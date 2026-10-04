@@ -12,6 +12,8 @@ Hemorrhagic Fevers
 Ebola
 Parasitic Diseases
 Traveler's Health
+
+[infections]
 Cholera
 Diarrhea
 Dehydration

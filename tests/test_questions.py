@@ -42,7 +42,7 @@ def test_gold_labels(rows):
 
 def test_every_area_covered(rows):
     areas = {r["area"] for r in rows if r["type"] == "answerable"}
-    assert len(areas) == 8
+    assert len(areas) == 9
 
 
 def test_questions_present(rows):
