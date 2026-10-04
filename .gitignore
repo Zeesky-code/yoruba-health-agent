@@ -6,3 +6,4 @@ __pycache__/
 corpus/raw/
 .DS_Store
 evals/.generate_cache.jsonl
+traces/adhoc.jsonl

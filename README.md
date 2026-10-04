@@ -13,7 +13,7 @@ agent loop beats a fixed retrieval pipeline. Built on Cohere (`embed-multilingua
 - [x] Session 1: corpus (fetch, chunk, embed), English search check
 - [x] Session 2: eval set, synthetic v0 (hand-written Yorùbá v1 still to come)
 - [x] Session 3: tools + fixed pipeline, retrieval table
-- [ ] Session 4: agent harness (loop, retries, budget, traces)
+- [x] Session 4: agent harness (loop, retries, budget, traces)
 - [ ] Session 5: run both, report tables
 - [ ] Session 6: Gradio app on HF Spaces, full write-up
 
@@ -81,6 +81,33 @@ Raw rankings are in `evals/results/retrieval.jsonl`.
   medical questions.** Those retrieve relevant pages and score high (median 0.72), so
   only 1 of 10 is refused. Out-of-scope questions are caught (9 of 10). The threshold
   was set on this same eval set.
+
+## Agent harness
+
+`agent/harness.py` runs Command A as a controller. At each step it picks one of the five
+tools, until `answer` or `refuse` ends the run. It follows the spec, with two changes
+backed by the results above:
+
+- **Translate first, not as a fallback.** Rerank collapses on raw Yorùbá queries, so the
+  prompt tells the agent to `translate_query` before searching. The agent's real
+  decisions are whether to refuse, why, and whether to retry one rephrased search when
+  the top rerank score is under 0.1.
+- **`max_steps=6`, not 5.** The answer path (translate → search → rerank → answer) takes
+  4 steps, and one rephrased search adds 2.
+
+Transient tool failures are retried twice, with sleeps of 1 s and then 1.5 s. Invalid
+arguments from the model (such as a chunk ID it never saw) are not retried. They go
+back to the model as an observation so it can recover. Spend is checked against
+`budget_usd=0.02` before every step. Once it's over, the run ends with a
+`low_confidence` refusal rather than continuing. Every step writes one JSONL line to
+`traces/` (`agent/trace.py`). The cost on each line includes the controller's own
+decision call. Latency excludes time spent waiting out the trial key's 20-calls/minute
+limit, which is logged separately as `rate_limit_wait_ms`.
+
+**Prices** (USD, checked 2026-10-04): Command A costs $2.50 input / $10 output per
+million tokens, and Rerank $2 per 1,000 searches. These come from third-party trackers,
+because Cohere's pricing page no longer lists these models. Tiny Aya has no published
+price, so it is *assumed* to cost the same as Aya Expanse ($0.50 / $1.50).
 
 ## Corpus
 
