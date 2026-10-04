@@ -12,7 +12,7 @@ agent loop beats a fixed retrieval pipeline. Built on Cohere (`embed-multilingua
 
 - [x] Session 1: corpus (fetch, chunk, embed), English search check
 - [x] Session 2: eval set, synthetic v0 (hand-written Yorùbá v1 still to come)
-- [x] Session 3: tools + fixed pipeline, retrieval table (Yorùbá answer quality still open)
+- [x] Session 3: tools + fixed pipeline, retrieval table
 - [ ] Session 4: agent harness (loop, retries, budget, traces)
 - [ ] Session 5: run both, report tables
 - [ ] Session 6: Gradio app on HF Spaces, full write-up
@@ -42,6 +42,16 @@ agent loop beats a fixed retrieval pipeline. Built on Cohere (`embed-multilingua
   the English passages, so English queries share their wording. The true cross-lingual
   gap is smaller than 0.975 − 0.842 suggests.
 
+I also tried query pivots with reciprocal rank fusion, from my
+[multilingual RAG write-up](https://zeeskylaw.medium.com/multilingual-rag-query-pivots-rank-fusion-and-other-tricks-c88a7fe13b9d).
+It fused the Yorùbá and translated rankings. **It did not help by default here:**
+recall@5 was 0.78–0.83, against 0.84 for the translated query alone. That project's
+corpus is multilingual, so each pivot reaches documents the others can't. Here every
+document is English, so the Yorùbá pivot only adds a weaker ranking of the same
+documents. Fusion did help when the translation was bad: with the Command A translator,
+it raised recall@5 from 0.66 to 0.69. So it's a candidate fallback for the agent, not a
+default for the pipeline.
+
 Reproduce with `uv run python -m evals.run_eval retrieval && uv run python -m evals.report`.
 Raw rankings are in `evals/results/retrieval.jsonl`.
 
@@ -54,11 +64,19 @@ Raw rankings are in `evals/results/retrieval.jsonl`.
   Switching to `tiny-aya-global` fixed all four and raised translated recall@5 from 0.68
   to 0.84. The old rankings are kept in
   `evals/results/retrieval_translate-command-a.jsonl`.
-- **No Cohere model tested writes good grounded Yorùbá answers yet.** `command-a-03-2025`
-  cites its sources correctly, but its Yorùbá is often wrong. One answer opened with
-  "a gift is what causes malaria", and another got stuck repeating a sentence.
-  `tiny-aya-global` writes fluent Yorùbá, but it ignored the documents, gave no
-  citations, and named antimalarial drugs that aren't in the sources.
+- **No Cohere model I tested could write a grounded answer directly in Yorùbá.**
+  `command-a-03-2025` cites its sources correctly, but its Yorùbá is often wrong. One
+  answer opened with "a gift is what causes malaria", and another got stuck repeating a
+  sentence. `tiny-aya-global` writes fluent Yorùbá, but it ignored the documents, gave
+  no citations, and named antimalarial drugs that aren't in the sources. **What I
+  changed:** `answer()` now has Command A answer in English with native citations, then
+  `tiny-aya-global` translates the answer sentence by sentence, so every Yorùbá sentence
+  keeps the chunk IDs it was grounded in. The English answer is kept on the `Answer` for
+  auditing. The Yorùbá answers are therefore translations, not natively written text.
+- **The answer translator garbled key health terms.** "Mosquito" came out as *ọlọ́wọ́*
+  ("rich person") and "bacteria" as *àjẹsára* ("vaccine/immunity"). The translation
+  prompt now carries a 16-term glossary (*ẹ̀fọn*, *ibà*, *ikọ́ ẹ̀gbẹ*, *ẹ̀jẹ̀ ríru*…), which
+  fixed both.
 - **The pipeline's refusal threshold (top rerank score < 0.1) can't catch personal
   medical questions.** Those retrieve relevant pages and score high (median 0.72), so
   only 1 of 10 is refused. Out-of-scope questions are caught (9 of 10). The threshold
