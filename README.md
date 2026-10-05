@@ -5,6 +5,8 @@ cites its sources, and refuses when it shouldn't answer. A harness measures whet
 agent loop beats a fixed retrieval pipeline. Built on Cohere (`embed-multilingual-v3.0`,
 `rerank-multilingual-v3.0`, Command chat).
 
+![Demo: a Yorùbá malaria answer with per-sentence citations to MedlinePlus](docs/demo.jpg)
+
 > **Not medical advice.** This is a research prototype. It has not been clinically
 > validated. If you are unwell, see a health worker.
 
