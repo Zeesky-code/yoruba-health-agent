@@ -5,6 +5,9 @@ cites its sources, and refuses when it shouldn't answer. A harness measures whet
 agent loop beats a fixed retrieval pipeline. Built on Cohere (`embed-multilingual-v3.0`,
 `rerank-multilingual-v3.0`, Command chat).
 
+**[Try it live →](https://yoruba-health-agent.onrender.com/)** It runs on Render's free
+tier, so the first visit after a quiet spell takes about a minute while the app wakes up.
+
 ![Demo: a Yorùbá malaria answer with per-sentence citations to MedlinePlus](docs/demo.jpg)
 
 > **Not medical advice.** This is a research prototype. It has not been clinically
